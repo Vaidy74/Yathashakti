@@ -1,0 +1,499 @@
+// This is the Prisma schema for Yathashakti
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// System Models
+model User {
+  id            String   @id @default(cuid())
+  name          String
+  email         String   @unique
+  password      String?
+  role          UserRole @default(FIELD_OFFICER)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relations
+  tasks         Task[]
+  programs      ProgramTeamMember[]
+  programsOwned Program[]  @relation("ProgramOwner")
+  logs          AuditLog[]
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  PROGRAM_MANAGER
+  FIELD_OFFICER
+  FINANCE_ADMIN
+}
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  entityType   String   // e.g., "Donor", "Program", etc.
+  entityId     String   
+  action       String   // e.g., "create", "update", "delete"
+  previousData Json?    // JSON representation of previous state
+  newData      Json?    // JSON representation of new state
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  createdAt    DateTime @default(now())
+}
+
+// Core Domain Models
+
+// Donor Management
+model Donor {
+  id             String       @id @default(cuid())
+  name           String
+  type           DonorType
+  keyContact     String?
+  keyContactRole String?
+  email          String       @unique
+  phone          String?
+  address        String?
+  onboardingDate DateTime     @default(now())
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  
+  // Relations
+  contacts       DonorContact[]
+  documents      DonorDocument[]
+  contributions  ProgramFunding[]
+}
+
+enum DonorType {
+  INDIVIDUAL
+  LEGAL_ENTITY
+}
+
+model DonorContact {
+  id        String   @id @default(cuid())
+  name      String
+  role      String?
+  email     String?
+  phone     String?
+  donorId   String
+  donor     Donor    @relation(fields: [donorId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model DonorDocument {
+  id          String   @id @default(cuid())
+  label       String
+  fileUrl     String
+  fileType    String?
+  uploadedAt  DateTime @default(now())
+  donorId     String
+  donor       Donor    @relation(fields: [donorId], references: [id], onDelete: Cascade)
+}
+
+// Program Management
+model Program {
+  id                   String               @id @default(cuid())
+  name                 String
+  summary              String
+  categoryId           String
+  category             ProgramCategory      @relation(fields: [categoryId], references: [id])
+  status               ProgramStatus        @default(PLANNING)
+  startDate            DateTime
+  endDate              DateTime?
+  ownerId              String               // Program Manager
+  owner                User                 @relation("ProgramOwner", fields: [ownerId], references: [id])
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  
+  // Theory of Change
+  problemStatement     String?              @db.Text
+  longTermGoal         String?              @db.Text
+  targetPopulation     String?              @db.Text
+  shortTermOutcomes    String?              @db.Text
+  mediumTermOutcomes   String?              @db.Text
+  outputs              String?              @db.Text
+  activities           String?              @db.Text
+  keyAssumptions       String?              @db.Text
+  
+  // Grant Terms
+  minGrantSize         Float                @default(0)
+  maxGrantSize         Float                @default(0)
+  minRepaymentTenor    Int                  @default(1)
+  maxRepaymentTenor    Int                  @default(12)
+  
+  // Budget
+  budgetForRevolvingGrants Float            @default(0)
+  
+  // Relations
+  sdgGoals             ProgramSDGGoal[]
+  serviceProviders     ProgramServiceProvider[]
+  team                 ProgramTeamMember[]
+  metrics              ImpactMetric[]
+  eligibilityCriteria  EligibilityCriterion[]
+  milestones           ProgramMilestone[]
+  documents            ProgramDocument[]
+  funding              ProgramFunding[]
+  expenses             ProgramExpense[]
+  grants               Grant[]
+}
+
+enum ProgramStatus {
+  PLANNING
+  LIVE
+  ON_HOLD
+  CLOSED
+}
+
+model ProgramCategory {
+  id       String    @id @default(cuid())
+  name     String    @unique
+  programs Program[]
+}
+
+model SDGGoal {
+  id          String           @id
+  name        String
+  description String?
+  programs    ProgramSDGGoal[]
+}
+
+model ProgramSDGGoal {
+  programId   String
+  program     Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  sdgGoalId   String
+  sdgGoal     SDGGoal  @relation(fields: [sdgGoalId], references: [id], onDelete: Cascade)
+  
+  @@id([programId, sdgGoalId])
+}
+
+model ImpactMetric {
+  id           String   @id @default(cuid())
+  name         String
+  unit         String
+  baselineValue String?
+  midlineValue  String?
+  endlineValue  String?
+  targetValue   String?
+  notes        String?  @db.Text
+  programId    String
+  program      Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model EligibilityCriterion {
+  id          String   @id @default(cuid())
+  label       String
+  description String   @db.Text
+  programId   String
+  program     Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ProgramTeamMember {
+  programId String
+  program   Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@id([programId, userId])
+}
+
+model ProgramMilestone {
+  id            String          @id @default(cuid())
+  name          String
+  targetDate    DateTime?
+  status        MilestoneStatus @default(TO_DO)
+  ownerId       String?
+  description   String?         @db.Text
+  completedDate DateTime?
+  programId     String
+  program       Program         @relation(fields: [programId], references: [id], onDelete: Cascade)
+  tasks         Task[]          // Tasks generated from this milestone
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+}
+
+enum MilestoneStatus {
+  TO_DO
+  IN_PROGRESS
+  COMPLETED
+  ON_HOLD
+  CANCELLED
+}
+
+model ProgramDocument {
+  id          String     @id @default(cuid())
+  name        String
+  type        String
+  description String?    @db.Text
+  fileUrl     String?
+  uploadedAt  DateTime   @default(now())
+  programId   String
+  program     Program    @relation(fields: [programId], references: [id], onDelete: Cascade)
+}
+
+model ProgramFunding {
+  id            String   @id @default(cuid())
+  amount        Float
+  date          DateTime
+  notes         String?  @db.Text
+  donorId       String
+  donor         Donor    @relation(fields: [donorId], references: [id], onDelete: Cascade)
+  programId     String
+  program       Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model ProgramExpense {
+  id        String   @id @default(cuid())
+  name      String
+  budgeted  Float
+  actual    Float?
+  programId String
+  program   Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Service Provider Management
+model ServiceProvider {
+  id            String                    @id @default(cuid())
+  name          String
+  contactPerson String?
+  type          ServiceProviderType
+  email         String?
+  phone         String?
+  registeredOn  DateTime                  @default(now())
+  createdAt     DateTime                  @default(now())
+  updatedAt     DateTime                  @updatedAt
+  
+  // Relations
+  programs      ProgramServiceProvider[]
+  grants        Grant[]
+}
+
+enum ServiceProviderType {
+  IMPLEMENTING_PARTNER_SELF
+  IMPLEMENTING_PARTNER_THIRD_PARTY
+  ME_PARTNER_THIRD_PARTY
+}
+
+model ProgramServiceProvider {
+  programId         String
+  program           Program         @relation(fields: [programId], references: [id], onDelete: Cascade)
+  serviceProviderId String
+  serviceProvider   ServiceProvider @relation(fields: [serviceProviderId], references: [id], onDelete: Cascade)
+  
+  @@id([programId, serviceProviderId])
+}
+
+// Grantee Management
+model Grantee {
+  id           String    @id @default(cuid())
+  name         String
+  gender       Gender?
+  phone        String
+  email        String?
+  address      String?
+  village      String
+  district     String
+  state        String
+  pincode      String?
+  dateOfBirth  DateTime?
+  idType       String?
+  idNumber     String?
+  sector       String
+  activities   String?
+  notes        String?   @db.Text
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  
+  // Relations
+  grants       Grant[]
+  documents    GranteeDocument[]
+  programs     String[]  // JSON array of program names for now, can be formalized later
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+model GranteeDocument {
+  id          String   @id @default(cuid())
+  name        String
+  type        String
+  fileUrl     String
+  uploadedAt  DateTime @default(now())
+  granteeId   String
+  grantee     Grantee  @relation(fields: [granteeId], references: [id], onDelete: Cascade)
+}
+
+// Grant Lifecycle Management
+model Grant {
+  id                  String       @id @default(cuid())
+  grantIdentifier     String       @unique // Human-readable identifier
+  amount              Float
+  disbursementDate    DateTime?
+  status              GrantStatus  @default(PENDING)
+  repaymentRate       Float        @default(100)
+  notes               String?      @db.Text
+  
+  // Relations
+  programId           String
+  program             Program      @relation(fields: [programId], references: [id])
+  granteeId           String
+  grantee             Grantee      @relation(fields: [granteeId], references: [id])
+  serviceProviderId   String?
+  serviceProvider     ServiceProvider? @relation(fields: [serviceProviderId], references: [id])
+  repaymentSchedule   RepaymentInstallment[]
+  repaymentHistory    Repayment[]
+  communications      Communication[]
+  ledgerEntries       LedgerEntry[]
+  
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+}
+
+enum GrantStatus {
+  PENDING
+  DISBURSED
+  CURRENT
+  OVERDUE
+  COMPLETED
+  DEFAULTED
+  CANCELLED
+}
+
+model RepaymentInstallment {
+  id               String              @id @default(cuid())
+  dueDate          DateTime
+  expectedAmount   Float
+  status           InstallmentStatus   @default(PENDING)
+  paidAmount       Float?
+  paymentDate      DateTime?
+  notes            String?             @db.Text
+  grantId          String
+  grant            Grant               @relation(fields: [grantId], references: [id], onDelete: Cascade)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+}
+
+enum InstallmentStatus {
+  PENDING
+  PAID
+  PARTIALLY_PAID
+  OVERDUE
+  CANCELLED
+}
+
+model Repayment {
+  id             String         @id @default(cuid())
+  amount         Float
+  date           DateTime
+  method         RepaymentMethod
+  notes          String?        @db.Text
+  grantId        String
+  grant          Grant          @relation(fields: [grantId], references: [id], onDelete: Cascade)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  
+  // Ledger entry associated with this repayment
+  ledgerEntries  LedgerEntry[]
+}
+
+enum RepaymentMethod {
+  UPI
+  BANK_TRANSFER
+  CASH
+  CHECK
+  OTHER
+}
+
+model Communication {
+  id           String              @id @default(cuid())
+  date         DateTime
+  type         CommunicationType
+  notes        String              @db.Text
+  evidence     String?             // Reference to evidence (e.g., image, voice note URL)
+  grantId      String
+  grant        Grant               @relation(fields: [grantId], references: [id], onDelete: Cascade)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+}
+
+enum CommunicationType {
+  SMS
+  WHATSAPP_TEXT
+  WHATSAPP_VOICE
+  PHONE_CALL
+  EMAIL
+  IN_PERSON
+  OTHER
+}
+
+// Ledger Management
+model LedgerEntry {
+  id               String             @id @default(cuid())
+  date             DateTime
+  type             LedgerEntryType
+  description      String
+  amount           Float
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  
+  // Relations - can be linked to different entities
+  grantId          String?
+  grant            Grant?             @relation(fields: [grantId], references: [id])
+  repaymentId      String?
+  repayment        Repayment?         @relation(fields: [repaymentId], references: [id])
+}
+
+enum LedgerEntryType {
+  DISBURSEMENT
+  REPAYMENT
+  DONOR_CONTRIBUTION
+  ADJUSTMENT
+}
+
+// Task Management
+model Task {
+  id                    String      @id @default(cuid())
+  title                 String
+  description           String?     @db.Text
+  dueDate               DateTime?
+  status                TaskStatus  @default(TO_DO)
+  priority              TaskPriority @default(MEDIUM)
+  assigneeId            String?
+  assignee              User?       @relation(fields: [assigneeId], references: [id])
+  relatedProgramId      String?
+  originatingMilestoneId String?
+  originatingMilestone  ProgramMilestone? @relation(fields: [originatingMilestoneId], references: [id])
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+}
+
+enum TaskStatus {
+  TO_DO
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
