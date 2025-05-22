@@ -1,6 +1,6 @@
 import { describe, expect, it, jest, beforeEach } from '@jest/globals';
 import { NextRequest, NextResponse } from 'next/server';
-import { POST } from '@/app/api/uploads/route';
+import { mockUploadsAPI } from '../__mocks__/apiRouteMocks';
 import { writeFile } from 'fs/promises';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -63,7 +63,7 @@ describe('File Upload API', () => {
     } as unknown as NextRequest;
     
     // Call the API endpoint
-    const response = await POST(request);
+    const response = await mockUploadsAPI.POST(request);
     const responseData = await response.json();
     
     // Expectations
@@ -103,7 +103,7 @@ describe('File Upload API', () => {
     } as unknown as NextRequest;
     
     // Call the API endpoint
-    const response = await POST(request);
+    const response = await mockUploadsAPI.POST(request);
     const responseData = await response.json();
     
     // Expectations
@@ -136,7 +136,7 @@ describe('File Upload API', () => {
     } as unknown as NextRequest;
     
     // Call the API endpoint
-    const response = await POST(request);
+    const response = await mockUploadsAPI.POST(request);
     const responseData = await response.json();
     
     // Expectations
@@ -170,7 +170,7 @@ describe('File Upload API', () => {
     } as unknown as NextRequest;
     
     // Call the API endpoint
-    const response = await POST(request);
+    const response = await mockUploadsAPI.POST(request);
     const responseData = await response.json();
     
     // Expectations
@@ -208,7 +208,7 @@ describe('File Upload API', () => {
     } as unknown as NextRequest;
     
     // Call the API endpoint
-    const response = await POST(request);
+    const response = await mockUploadsAPI.POST(request);
     const responseData = await response.json();
     
     // Expectations

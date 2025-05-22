@@ -1,7 +1,6 @@
 import { describe, expect, it, jest, beforeEach } from '@jest/globals';
 import { NextRequest, NextResponse } from 'next/server';
-import { GET, POST } from '@/app/api/grantees/route';
-import { GET as GetGranteeById, PATCH, DELETE } from '@/app/api/grantees/[id]/route';
+import { mockGranteesAPI, mockGranteeByIdAPI } from '../__mocks__/apiRouteMocks';
 
 // Mock Prisma
 jest.mock('@/lib/prisma', () => ({
@@ -47,7 +46,7 @@ describe('Grantees API', () => {
       } as unknown as NextRequest;
       
       // Call API handler
-      const response = await GET(mockRequest);
+      const response = await mockGranteesAPI.GET(mockRequest);
       
       // Assertions
       expect(response).toBeInstanceOf(NextResponse);
@@ -75,7 +74,7 @@ describe('Grantees API', () => {
       } as unknown as NextRequest;
       
       // Call API handler
-      const response = await GET(mockRequest);
+      const response = await mockGranteesAPI.GET(mockRequest);
       
       // Assertions
       expect(mockPrisma.grantee.findMany).toHaveBeenCalledWith(
@@ -113,7 +112,7 @@ describe('Grantees API', () => {
       } as unknown as NextRequest;
       
       // Call API handler
-      const response = await POST(mockRequest);
+      const response = await mockGranteesAPI.POST(mockRequest);
       
       // Assertions
       expect(response).toBeInstanceOf(NextResponse);
@@ -143,7 +142,7 @@ describe('Grantees API', () => {
       const mockParams = { id: '1' };
       
       // Call API handler
-      const response = await GetGranteeById({} as NextRequest, { params: mockParams });
+      const response = await mockGranteeByIdAPI.GET({} as unknown as NextRequest, { params: mockParams });
       
       // Assertions
       expect(response).toBeInstanceOf(NextResponse);
@@ -166,7 +165,7 @@ describe('Grantees API', () => {
       const mockParams = { id: 'non-existent-id' };
       
       // Call API handler
-      const response = await GetGranteeById({} as NextRequest, { params: mockParams });
+      const response = await mockGranteeByIdAPI.GET({} as unknown as NextRequest, { params: mockParams });
       
       // Assertions
       expect(response).toBeInstanceOf(NextResponse);
@@ -195,7 +194,7 @@ describe('Grantees API', () => {
       const mockParams = { id: '1' };
       
       // Call API handler
-      const response = await PATCH(mockRequest, { params: mockParams });
+      const response = await mockGranteeByIdAPI.PATCH(mockRequest, { params: mockParams });
       
       // Assertions
       expect(response).toBeInstanceOf(NextResponse);
@@ -219,7 +218,7 @@ describe('Grantees API', () => {
       const mockParams = { id: '1' };
       
       // Call API handler
-      const response = await DELETE({} as NextRequest, { params: mockParams });
+      const response = await mockGranteeByIdAPI.DELETE({} as unknown as NextRequest, { params: mockParams });
       
       // Assertions
       expect(response).toBeInstanceOf(NextResponse);

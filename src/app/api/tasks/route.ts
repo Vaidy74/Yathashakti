@@ -30,7 +30,7 @@ const taskQuerySchema = z.object({
 });
 
 // GET handler for retrieving tasks with filters
-export const GET = withApiRateLimit(async function GET(request: NextRequest) {
+export const GET = withApiRateLimit(async (request: NextRequest) => {
   try {
     const session = await getServerSession(authOptions);
     if (!session) {
@@ -114,10 +114,10 @@ export const GET = withApiRateLimit(async function GET(request: NextRequest) {
     console.error('Error fetching tasks:', error);
     return NextResponse.json({ error: 'Failed to fetch tasks' }, { status: 500 });
   }
-}
+});
 
 // POST handler for creating a new task
-export const POST = withApiRateLimit(async function POST(request: NextRequest) {
+export const POST = withApiRateLimit(async (request: NextRequest) => {
   try {
     const session = await getServerSession(authOptions);
     if (!session) {

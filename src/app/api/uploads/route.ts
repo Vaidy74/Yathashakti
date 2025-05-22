@@ -4,11 +4,12 @@ import { join } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
+import { withApiRateLimit } from "@/utils/apiRateLimit";
 
 // In a production environment, you would use a cloud storage service like AWS S3
 // This is a simplified implementation for development purposes
 
-export async function POST(request: NextRequest) {
+export const POST = withApiRateLimit(async (request: NextRequest) => {
   try {
     // Check authentication
     const session = await getServerSession(authOptions);
@@ -75,4 +76,4 @@ export async function POST(request: NextRequest) {
       message: (error as Error).message
     }, { status: 500 });
   }
-}
+});

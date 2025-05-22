@@ -60,8 +60,9 @@
 ### Priority 4: Technical Infrastructure ✓
 - **TS: Security**
   - ✅ TS-01: Implement rate limiting for API endpoints
-  - ✅ TS-02: Add CSRF protection for form submissions
+  - ✅ TS-02: Add CSRF protection for state-changing requests
   - ✅ TS-03: Implement input validation with Zod
+  - 🔄 TS-04: Update test infrastructure for security features
 - **PO: Performance**
   - ✅ PO-01: Implement data caching strategies
 - **CI: CI/CD Pipeline**
