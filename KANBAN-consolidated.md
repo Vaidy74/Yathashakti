@@ -1,28 +1,5 @@
 # Yathashakti Project - Kanban Board
 
-## 📋 Definition of Done
-
-A task is considered complete when it meets all of the following criteria:
-
-1. **Code Complete**: All code changes are implemented and working as expected.
-2. **Testing**: Unit tests are written and passing (minimum 80% coverage).
-3. **Documentation**: Code is properly documented and any necessary user documentation is updated.
-4. **Code Review**: Pull request has been approved by at least one team member.
-5. **CI/CD**: All automated tests are passing in the CI/CD pipeline.
-6. **Security**: Code follows security best practices and passes security scans.
-7. **Performance**: Changes meet performance requirements and don't introduce regressions.
-8. **Accessibility**: UI changes meet accessibility standards.
-9. **Cross-browser**: Functionality works across supported browsers.
-
-## 🔄 Kanban Update Process
-
-1. **Task Creation**: New tasks are added to the BACKLOG section with appropriate priority.
-2. **Work In Progress**: When work begins on a task, move it to the WORK IN PROGRESS section and mark with 🔄.
-3. **Completion**: When a task meets the Definition of Done, move it to the COMPLETED section and mark with ✅.
-4. **Board Maintenance**: The Kanban board should be reviewed and updated weekly during sprint planning.
-5. **Priority Changes**: Any changes to task priorities must be discussed with the team lead and documented.
-
-
 ## 🔄 WORK IN PROGRESS
 
 ### Priority 7: AI & Intelligence
