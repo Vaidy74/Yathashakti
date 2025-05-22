@@ -196,6 +196,11 @@
 
 For a feature to be considered COMPLETE, it must pass all of the following criteria:
 
+### Development Process
+- Changes are committed to git with descriptive messages
+- Code is pushed to GitHub repository after each significant milestone
+- Each completed Kanban item is backed up to GitHub
+
 ### Frontend Requirements (30%)
 - All UI components render correctly
 - Forms include proper validation
