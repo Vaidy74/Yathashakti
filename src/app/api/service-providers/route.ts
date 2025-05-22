@@ -1,16 +1,41 @@
 import { prisma } from '@/lib/prisma';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { ServiceProvider } from '@/types/service-provider';
+import { z } from 'zod';
+import { withApiRateLimit } from '@/utils/apiRateLimit';
+import { validateQuery, validateBody, createValidationErrorResponse } from '@/utils/validation';
+import { paginationQuerySchema, calculateSkip, createPaginatedResponse } from '@/utils/pagination';
+
+// Schema for service provider query parameters, extending the pagination schema
+const serviceProviderQuerySchema = paginationQuerySchema.extend({
+  category: z.string().optional(),
+  search: z.string().optional(),
+});
 
 // GET /api/service-providers - List all service providers with optional filtering
-export async function GET(request: Request) {
+export const GET = withApiRateLimit(async (request: NextRequest) => {
   try {
-    const { searchParams } = new URL(request.url);
-    const category = searchParams.get('category');
-    const search = searchParams.get('search');
-    const limit = parseInt(searchParams.get('limit') || '10');
-    const page = parseInt(searchParams.get('page') || '1');
-    const skip = (page - 1) * limit;
+    // Validate query parameters
+    const [isValid, queryParams, validationError] = validateQuery(request, serviceProviderQuerySchema);
+    
+    if (!isValid) {
+      // Return validation error if query parameters are invalid
+      if (validationError) {
+        return createValidationErrorResponse(validationError);
+      }
+      return NextResponse.json({ error: 'Invalid query parameters' }, { status: 400 });
+    }
+
+    // Extract validated parameters
+    const {
+      category = '',
+      search = '',
+      page = 1,
+      limit = 10
+    } = queryParams || {};
+    
+    // Calculate pagination using the standardized utility
+    const skip = calculateSkip(page, limit);
 
     // Build filter criteria
     const where: any = {};
@@ -67,51 +92,89 @@ export async function GET(request: Request) {
       _count: undefined,
     }));
 
-    return NextResponse.json({
-      serviceProviders: formattedServiceProviders,
-      pagination: {
-        total,
-        pages: Math.ceil(total / limit),
-        page,
-        limit,
-      },
-    });
+    // Return standardized paginated response
+    return NextResponse.json(
+      createPaginatedResponse(formattedServiceProviders, total, page, limit)
+    );
   } catch (error) {
     console.error('Error fetching service providers:', error);
     return NextResponse.json({ error: 'Failed to fetch service providers' }, { status: 500 });
   }
-}
+});
+
+// Schema for creating a new service provider
+const serviceProviderCreateSchema = z.object({
+  name: z.string().min(1, { message: "Service provider name is required" }),
+  contactPerson: z.string().optional(),
+  email: z.string().email().optional(),
+  phone: z.string().optional(),
+  location: z.string().optional(),
+  address: z.string().optional(),
+  category: z.string().optional(),
+  services: z.string().optional(),
+  expertise: z.string().optional(),
+  ratePerDay: z.number().nonnegative().optional(),
+  profileSummary: z.string().optional(),
+  website: z.string().url().optional().nullable(),
+  programIds: z.array(z.string()).optional()
+});
 
 // POST /api/service-providers - Create a new service provider
-export async function POST(request: Request) {
+export const POST = withApiRateLimit(async (request: NextRequest) => {
   try {
-    const data = await request.json();
+    // Validate request body
+    const [isValid, validatedData, validationError] = await validateBody(request, serviceProviderCreateSchema);
     
-    // Validate required fields
-    if (!data.name || !data.category || !data.type) {
-      return NextResponse.json(
-        { error: 'Name, category, and type are required fields' },
-        { status: 400 }
-      );
+    if (!isValid) {
+      // Return validation error if body is invalid
+      if (validationError) {
+        return createValidationErrorResponse(validationError);
+      }
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    }
+    
+    if (!validatedData) {
+      return NextResponse.json({ error: 'Missing required data' }, { status: 400 });
     }
 
-    // Create service provider
+    // Extract validated fields
+    const { 
+      name,
+      contactPerson,
+      email,
+      phone,
+      location,
+      address,
+      category,
+      services,
+      expertise,
+      ratePerDay,
+      profileSummary,
+      website,
+      programIds = []
+    } = validatedData;
+    
+    // Create the service provider
     const serviceProvider = await prisma.serviceProvider.create({
       data: {
-        name: data.name,
-        category: data.category,
-        type: data.type,
-        contactPerson: data.contactPerson || null,
-        contactNumber: data.contactNumber || null,
-        email: data.email || null,
-        phone: data.contactNumber || null, // Legacy field, use contactNumber
-        location: data.location || null,
-        description: data.description || null,
-        website: data.website || null,
-        services: data.services || [],
-        ratePerDay: data.ratePerDay ? parseFloat(data.ratePerDay) : null,
-        registeredOn: data.registeredOn ? new Date(data.registeredOn) : new Date(),
-      },
+        name,
+        contactPerson: contactPerson || null,
+        email: email || null,
+        phone: phone || null,
+        location: location || null,
+        address: address || null,
+        category: category || null,
+        services: services || '',
+        expertise: expertise || '',
+        ratePerDay: ratePerDay || null,
+        profileSummary: profileSummary || null,
+        website: website || null,
+        programs: programIds.length > 0 ? {
+          create: programIds.map((programId: string) => ({
+            program: { connect: { id: programId } }
+          }))
+        } : undefined
+      }
     });
 
     return NextResponse.json(serviceProvider, { status: 201 });
@@ -119,4 +182,4 @@ export async function POST(request: Request) {
     console.error('Error creating service provider:', error);
     return NextResponse.json({ error: 'Failed to create service provider' }, { status: 500 });
   }
-}
+});

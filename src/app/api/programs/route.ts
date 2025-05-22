@@ -2,9 +2,20 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
+import { z } from 'zod';
+import { withApiRateLimit } from '@/utils/apiRateLimit';
+import { validateQuery, validateBody, createValidationErrorResponse } from '@/utils/validation';
+import { paginationQuerySchema, calculateSkip, createPaginatedResponse } from '@/utils/pagination';
+
+// Schema for program query parameters, extending the pagination schema
+const programQuerySchema = paginationQuerySchema.extend({
+  search: z.string().optional(),
+  status: z.string().optional(),
+  categoryId: z.string().optional()
+});
 
 // GET - Retrieve all programs with pagination and filtering
-export async function GET(request: NextRequest) {
+export const GET = withApiRateLimit(async (request: NextRequest) => {
   try {
     // Check authentication
     const session = await getServerSession(authOptions);
@@ -12,13 +23,28 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     
-    // Get query parameters
-    const searchParams = request.nextUrl.searchParams;
-    const limit = parseInt(searchParams.get('limit') || '10');
-    const offset = parseInt(searchParams.get('offset') || '0'); 
-    const search = searchParams.get('search') || '';
-    const status = searchParams.get('status') || '';
-    const categoryId = searchParams.get('categoryId') || '';
+    // Validate query parameters
+    const [isValid, queryParams, validationError] = validateQuery(request, programQuerySchema);
+    
+    if (!isValid) {
+      // Return validation error if query parameters are invalid
+      if (validationError) {
+        return createValidationErrorResponse(validationError);
+      }
+      return NextResponse.json({ error: 'Invalid query parameters' }, { status: 400 });
+    }
+
+    // Extract validated parameters
+    const {
+      search = '',
+      status = '',
+      categoryId = '',
+      page = 1,
+      limit = 10
+    } = queryParams || {};
+    
+    // Calculate pagination
+    const skip = calculateSkip(page, limit);
     
     // Build filters
     const filters: any = {};
@@ -43,9 +69,11 @@ export async function GET(request: NextRequest) {
       where: filters
     });
     
-    // Get programs
+    // Get programs with proper pagination
     const programs = await prisma.program.findMany({
       where: filters,
+      skip,
+      take: limit,
       include: {
         category: true,
         teamMembers: {
@@ -62,23 +90,15 @@ export async function GET(request: NextRequest) {
           }
         }
       },
-      skip: offset,
-      take: limit,
       orderBy: {
         createdAt: 'desc'
       }
     });
     
-    // Return response
-    return NextResponse.json({
-      programs,
-      pagination: {
-        total: totalCount,
-        offset,
-        limit,
-        hasMore: offset + limit < totalCount
-      }
-    });
+    // Return standardized paginated response
+    return NextResponse.json(
+      createPaginatedResponse(programs, totalCount, page, limit)
+    );
     
   } catch (error) {
     console.error('Error fetching programs:', error);
@@ -87,10 +107,23 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+});
+
+// Schema for creating a new program
+const programCreateSchema = z.object({
+  name: z.string().min(1, { message: "Program name is required" }),
+  description: z.string().optional(),
+  startDate: z.string().transform(val => new Date(val)),
+  endDate: z.string().optional().transform(val => val ? new Date(val) : undefined),
+  status: z.string().default('ACTIVE'),
+  budget: z.number().nonnegative().default(0),
+  categoryId: z.string().optional(),
+  teamMembers: z.array(z.string()).optional(),
+  sdgGoals: z.array(z.string()).optional()
+});
 
 // POST - Create a new program
-export async function POST(request: NextRequest) {
+export const POST = withApiRateLimit(async (request: NextRequest) => {
   try {
     // Check authentication
     const session = await getServerSession(authOptions);
@@ -98,28 +131,53 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     
-    // Get request body
-    const body = await request.json();
+    // Validate request body
+    const [isValid, validatedData, validationError] = await validateBody(request, programCreateSchema);
+    
+    if (!isValid) {
+      // Return validation error if body is invalid
+      if (validationError) {
+        return createValidationErrorResponse(validationError);
+      }
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    }
+    
+    if (!validatedData) {
+      return NextResponse.json({ error: 'Missing required data' }, { status: 400 });
+    }
+    
+    // Extract validated fields
+    const { 
+      name, 
+      description, 
+      startDate, 
+      endDate, 
+      status = 'ACTIVE', 
+      budget = 0,
+      categoryId,
+      teamMembers = [],
+      sdgGoals = []
+    } = validatedData;
     
     // Create program
     const program = await prisma.program.create({
       data: {
-        name: body.name,
-        description: body.description,
-        startDate: new Date(body.startDate),
-        endDate: body.endDate ? new Date(body.endDate) : null,
-        budget: parseFloat(body.budget),
-        status: body.status,
-        category: body.categoryId ? {
-          connect: { id: body.categoryId }
+        name,
+        description,
+        startDate,
+        endDate,
+        budget,
+        status,
+        category: categoryId ? {
+          connect: { id: categoryId }
         } : undefined,
         teamMembers: {
-          create: body.teamMembers?.map((memberId: string) => ({
+          create: teamMembers.map((memberId: string) => ({
             user: { connect: { id: memberId } }
           })) || []
         },
         sdgGoals: {
-          create: body.sdgGoals?.map((goalId: string) => ({
+          create: sdgGoals.map((goalId: string) => ({
             sdgGoal: { connect: { id: goalId } }
           })) || []
         }
@@ -135,4 +193,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+});

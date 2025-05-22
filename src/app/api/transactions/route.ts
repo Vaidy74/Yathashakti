@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { 
   TransactionCategory, 
   TransactionCreateInput, 
@@ -7,23 +7,50 @@ import {
   TransactionType 
 } from '@/types/transaction';
 import { validateTransactionCreate, formatValidationErrors } from '@/utils/validations/transactionValidation';
+import { z } from 'zod';
+import { withApiRateLimit } from '@/utils/apiRateLimit';
+import { validateQuery, validateBody, createValidationErrorResponse } from '@/utils/validation';
+import { paginationQuerySchema, calculateSkip, createPaginatedResponse } from '@/utils/pagination';
+
+// Schema for transaction query parameters, extending the pagination schema
+const transactionQuerySchema = paginationQuerySchema.extend({
+  type: z.string().optional(),
+  category: z.string().optional(),
+  status: z.string().optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  search: z.string().optional(),
+  sortBy: z.string().optional(),
+  sortOrder: z.string().optional()
+});
 
 // GET /api/transactions - Get all transactions with filtering and pagination
-export async function GET(request: Request) {
+export const GET = withApiRateLimit(async (request: NextRequest) => {
   try {
-    const { searchParams } = new URL(request.url);
+    // Validate query parameters
+    const [isValid, queryParams, validationError] = validateQuery(request, transactionQuerySchema);
+    
+    if (!isValid) {
+      // Return validation error if query parameters are invalid
+      if (validationError) {
+        return createValidationErrorResponse(validationError);
+      }
+      return NextResponse.json({ error: 'Invalid query parameters' }, { status: 400 });
+    }
 
-    // Extract filter parameters
-    const type = searchParams.get('type') as TransactionType | null;
-    const category = searchParams.get('category') as TransactionCategory | null;
-    const status = searchParams.get('status') as TransactionStatus | null;
-    const startDate = searchParams.get('startDate');
-    const endDate = searchParams.get('endDate');
-    const search = searchParams.get('search');
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '10');
-    const sortBy = searchParams.get('sortBy') || 'date';
-    const sortOrder = searchParams.get('sortOrder') || 'desc';
+    // Extract validated parameters
+    const {
+      type = null,
+      category = null,
+      status = null,
+      startDate = null,
+      endDate = null,
+      search = null,
+      page = 1,
+      limit = 10,
+      sortBy = 'date',
+      sortOrder = 'desc'
+    } = queryParams || {};
 
     // Build filter conditions
     const where: any = {};
@@ -63,8 +90,8 @@ export async function GET(request: Request) {
       ];
     }
 
-    // Calculate pagination
-    const skip = (page - 1) * limit;
+    // Calculate pagination using the standardized utility
+    const skip = calculateSkip(page, limit);
 
     // Get total count for pagination
     const totalCount = await prisma.transaction.count({ where });
@@ -105,16 +132,10 @@ export async function GET(request: Request) {
       },
     });
 
-    // Return transactions with pagination metadata
-    return NextResponse.json({
-      data: transactions,
-      meta: {
-        totalCount,
-        page,
-        limit,
-        totalPages: Math.ceil(totalCount / limit),
-      },
-    });
+    // Return standardized paginated response
+    return NextResponse.json(
+      createPaginatedResponse(transactions, totalCount, page, limit)
+    );
   } catch (error) {
     console.error('Error fetching transactions:', error);
     return NextResponse.json(
@@ -125,7 +146,7 @@ export async function GET(request: Request) {
 }
 
 // POST /api/transactions - Create a new transaction
-export async function POST(request: Request) {
+export const POST = withApiRateLimit(async (request: NextRequest) => {
   try {
     const data: TransactionCreateInput = await request.json();
 
@@ -194,4 +215,4 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
-}
+});

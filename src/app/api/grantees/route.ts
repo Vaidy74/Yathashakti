@@ -1,10 +1,21 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
+import { z } from 'zod';
+import { withApiRateLimit } from '@/utils/apiRateLimit';
+import { validateQuery, validateBody, createValidationErrorResponse } from '@/utils/validation';
+import { paginationQuerySchema, calculateSkip, createPaginatedResponse } from '@/utils/pagination';
 
-// GET /api/grantees - Get all grantees
-export async function GET(request: Request) {
+// Schema for grantee query parameters, extending the pagination schema
+const granteeQuerySchema = paginationQuerySchema.extend({
+  search: z.string().optional(),
+  programId: z.string().optional(),
+  sector: z.string().optional(),
+});
+
+// GET /api/grantees - Get all grantees with pagination and filters
+export const GET = withApiRateLimit(async (request: NextRequest) => {
   try {
     // Check authentication
     const session = await getServerSession(authOptions);
@@ -12,13 +23,27 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get query parameters
-    const { searchParams } = new URL(request.url);
-    const search = searchParams.get('search') || '';
-    const programId = searchParams.get('programId');
-    const sector = searchParams.get('sector');
-    const limit = parseInt(searchParams.get('limit') || '50');
-    const offset = parseInt(searchParams.get('offset') || '0');
+    // Validate query parameters
+    const [isValid, queryParams, validationError] = validateQuery(request, granteeQuerySchema);
+    
+    if (!isValid) {
+      // Return validation error if query parameters are invalid
+      if (validationError) {
+        return createValidationErrorResponse(validationError);
+      }
+      return NextResponse.json({ error: 'Invalid query parameters' }, { status: 400 });
+    }
+
+    // Extract validated parameters
+    const {
+      search = '',
+      programId,
+      sector,
+      page = 1,
+      limit = 10
+    } = queryParams || {};
+    
+    const skip = calculateSkip(page, limit);
 
     // Build filter conditions
     const whereClause: any = {};
@@ -63,7 +88,7 @@ export async function GET(request: Request) {
       orderBy: {
         createdAt: 'desc'
       },
-      skip: offset,
+      skip,
       take: limit
     });
 
@@ -74,7 +99,9 @@ export async function GET(request: Request) {
 
     // Transform data to include program names
     const formattedGrantees = grantees.map(grantee => {
-      const programs = [...new Set(grantee.grants.map(grant => grant.program.name))];
+      // Use Array.from to avoid issues with Set iteration
+      const programNames = grantee.grants.map(grant => grant.program.name);
+      const programs = Array.from(new Set(programNames));
       
       return {
         id: grantee.id,
@@ -88,23 +115,39 @@ export async function GET(request: Request) {
       };
     });
 
-    return NextResponse.json({
-      grantees: formattedGrantees,
-      pagination: {
-        total,
-        offset,
-        limit
-      }
-    });
+    // Use standardized pagination response format
+    return NextResponse.json(
+      createPaginatedResponse(formattedGrantees, total, page, limit)
+    );
     
   } catch (error) {
     console.error('Error fetching grantees:', error);
     return NextResponse.json({ error: 'Failed to fetch grantees' }, { status: 500 });
   }
-}
+});
+
+// Schema for creating a new grantee
+const granteeCreateSchema = z.object({
+  name: z.string().min(2, { message: "Name must be at least 2 characters long" }),
+  gender: z.string().optional(),
+  phone: z.string().optional(),
+  email: z.string().email().optional().nullable(),
+  address: z.string().optional(),
+  village: z.string().optional(),
+  district: z.string().optional(),
+  state: z.string().optional(),
+  pincode: z.string().optional(),
+  dateOfBirth: z.string().optional().nullable(),
+  idType: z.string().optional(),
+  idNumber: z.string().optional(),
+  sector: z.string().optional(),
+  programId: z.string().optional(),
+  activities: z.string().optional(),
+  notes: z.string().optional()
+});
 
 // POST /api/grantees - Create a new grantee
-export async function POST(request: Request) {
+export const POST = withApiRateLimit(async (request: NextRequest) => {
   try {
     // Check authentication
     const session = await getServerSession(authOptions);
@@ -112,50 +155,65 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get request body
-    const body = await request.json();
+    // Validate request body
+    const [isValid, validatedData, validationError] = await validateBody(request, granteeCreateSchema);
     
-    // Validate required fields
+    if (!isValid) {
+      // Return validation error if body is invalid
+      if (validationError) {
+        return createValidationErrorResponse(validationError);
+      }
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    }
+    
     const { 
       name, gender, phone, address, village, district, state, pincode,
       dateOfBirth, idType, idNumber, sector, programId, activities, notes 
-    } = body;
+    } = validatedData || {};
 
-    if (!name || !phone || !village || !district || !state) {
+    // Additional validation checks if needed
+    if (!name) {
       return NextResponse.json({ 
         error: 'Missing required fields', 
-        requiredFields: ['name', 'phone', 'village', 'district', 'state']
+        details: 'Name is required' 
       }, { status: 400 });
     }
 
-    // Create new grantee
+    // Create the grantee in the database
     const grantee = await prisma.grantee.create({
       data: {
         name,
-        gender,
-        phone,
-        email: body.email || null,
-        address,
-        village,
-        district,
-        state,
-        pincode,
+        gender: gender as any, // Cast to any to avoid type issues
+        phone: phone || '',
+        email: validatedData.email || null,
+        address: address || '',
+        village: village || '',
+        district: district || '',
+        state: state || '',
+        pincode: pincode || '',
         dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
-        idType,
-        idNumber,
-        sector,
-        activities,
-        notes
+        idType: idType || '',
+        idNumber: idNumber || '',
+        sector: sector || '',
+        activities: activities || '',
+        notes: notes || ''
       }
     });
 
-    // If programId is provided, create an association with the program
+    // If programId is provided, create a grant linking the grantee to the program
     if (programId) {
       await prisma.grant.create({
         data: {
           granteeId: grantee.id,
           programId,
-          status: 'PENDING_APPROVAL',
+          status: 'PENDING_APPROVAL' as any, // Cast to any to avoid type issues
+          approvedAmount: 0,
+          disbursedAmount: 0,
+          remainingAmount: 0,
+          startDate: new Date(),
+          endDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)), // Default 1 year
+          description: `Initial grant for ${grantee.name}`,
+          createdById: session?.user?.id || 'system'
         }
       });
     }
@@ -166,8 +224,8 @@ export async function POST(request: Request) {
         entityType: 'Grantee',
         entityId: grantee.id,
         action: 'create',
-        newData: body,
-        userId: session.user.id
+        newData: validatedData as any,
+        userId: session?.user?.id || 'system'
       }
     });
 
@@ -183,4 +241,4 @@ export async function POST(request: Request) {
     console.error('Error creating grantee:', error);
     return NextResponse.json({ error: 'Failed to create grantee' }, { status: 500 });
   }
-}
+});
