@@ -74,6 +74,7 @@ export enum FilterOperator {
   ENDS_WITH = 'ENDS_WITH',
   BETWEEN = 'BETWEEN',
   IN = 'IN',
+  NOT_IN = 'NOT_IN'
 }
 
 /**
@@ -83,8 +84,32 @@ export interface ReportFilter {
   id: string;
   field: ReportField;
   operator: FilterOperator;
-  value: any;
-  additionalValue?: any; // For "BETWEEN" operations
+  value: any; // Can be a single value or array for IN/NOT_IN operators
+  additionalValue?: any; // For BETWEEN operator
+}
+
+export enum FilterLogicalOperator {
+  AND = 'AND',
+  OR = 'OR'
+}
+
+export interface FilterConditionGroup {
+  id: string;
+  logicalOperator: FilterLogicalOperator;
+  conditions: (ReportFilter | FilterConditionGroup)[];
+}
+
+/**
+ * Saved filter preset that can be reused
+ */
+export interface FilterPreset {
+  id: string;
+  name: string;
+  description?: string;
+  entityType: string;             // Type of entity this preset is for
+  filterGroup: FilterConditionGroup;  // Main filter condition group
+  filters?: ReportFilter[];       // For backward compatibility
+  createdAt: string;             // ISO date string when preset was created
 }
 
 /**
@@ -109,10 +134,13 @@ export interface ReportSort {
 export interface ReportTemplate {
   id: string;
   name: string;
-  description: string;
+  description?: string;
   primaryEntityType: ReportEntityType;
   fields: ReportField[];
   filters: ReportFilter[];
+  filterGroups?: FilterConditionGroup[]; // Advanced filter groups
+  isPredefined?: boolean;
+  savedFilterPresets?: FilterPreset[];
   sorts: ReportSort[];
   createdAt: Date;
   updatedAt: Date;

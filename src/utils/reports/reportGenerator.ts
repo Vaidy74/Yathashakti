@@ -7,7 +7,9 @@ import {
   FilterOperator,
   ReportField,
   ReportFieldType,
-  ReportAggregation
+  ReportAggregation,
+  FilterConditionGroup,
+  FilterLogicalOperator
 } from './reportTypes';
 import { generateTransactionPDF, generateTransactionExcel, downloadBlob } from '../exports/exportUtils';
 import { Transaction } from '@/types/transaction';
@@ -46,11 +48,84 @@ export const applyFiltersToData = <T>(data: T[], filters: ReportFilter[]): T[] =
           return fieldValue >= filter.value && fieldValue <= filter.additionalValue;
         case FilterOperator.IN:
           return Array.isArray(filter.value) && filter.value.includes(fieldValue);
+        case FilterOperator.NOT_IN:
+          return Array.isArray(filter.value) && !filter.value.includes(fieldValue);
         default:
           return true;
       }
     });
   });
+};
+
+/**
+ * Applies filter condition groups to a dataset
+ * @param data Array of data items
+ * @param filterGroups Array of filter condition groups to apply
+ * @returns Filtered data array
+ */
+export const applyFilterGroupsToData = <T>(data: T[], filterGroups: FilterConditionGroup[]): T[] => {
+  if (!filterGroups || filterGroups.length === 0) return data;
+  
+  return data.filter(item => {
+    // Each top-level group is applied with AND logic
+    return filterGroups.every(group => evaluateFilterGroup(item, group));
+  });
+};
+
+/**
+ * Evaluates a filter group against a data item
+ * @param item Data item to evaluate
+ * @param group Filter condition group
+ * @returns Boolean indicating if the item passes the filter group
+ */
+const evaluateFilterGroup = <T>(item: T, group: FilterConditionGroup): boolean => {
+  if (!group.conditions || group.conditions.length === 0) return true;
+  
+  // Determine if we need ANY condition to match (OR) or ALL conditions to match (AND)
+  const evaluator = group.logicalOperator === FilterLogicalOperator.OR
+    ? (conditions: boolean[]) => conditions.some(result => result)
+    : (conditions: boolean[]) => conditions.every(result => result);
+  
+  // Evaluate each condition in the group
+  const conditionResults = group.conditions.map(condition => {
+    // If it's a nested group, recursively evaluate it
+    if ('logicalOperator' in condition) {
+      return evaluateFilterGroup(item, condition as FilterConditionGroup);
+    }
+    
+    // Otherwise, it's a filter condition
+    const filter = condition as ReportFilter;
+    const fieldPath = filter.field.fieldPath;
+    const fieldValue = getNestedValue(item, fieldPath);
+    
+    switch (filter.operator) {
+      case FilterOperator.EQUALS:
+        return fieldValue === filter.value;
+      case FilterOperator.NOT_EQUALS:
+        return fieldValue !== filter.value;
+      case FilterOperator.GREATER_THAN:
+        return fieldValue > filter.value;
+      case FilterOperator.LESS_THAN:
+        return fieldValue < filter.value;
+      case FilterOperator.CONTAINS:
+        return String(fieldValue).toLowerCase().includes(String(filter.value).toLowerCase());
+      case FilterOperator.STARTS_WITH:
+        return String(fieldValue).toLowerCase().startsWith(String(filter.value).toLowerCase());
+      case FilterOperator.ENDS_WITH:
+        return String(fieldValue).toLowerCase().endsWith(String(filter.value).toLowerCase());
+      case FilterOperator.BETWEEN:
+        return fieldValue >= filter.value && fieldValue <= filter.additionalValue;
+      case FilterOperator.IN:
+        return Array.isArray(filter.value) && filter.value.includes(fieldValue);
+      case FilterOperator.NOT_IN:
+        return Array.isArray(filter.value) && !filter.value.includes(fieldValue);
+      default:
+        return true;
+    }
+  });
+  
+  // Apply the logical operator to the results
+  return evaluator(conditionResults);
 };
 
 /**
@@ -267,34 +342,37 @@ export const generateReport = async (
   try {
     // Apply filters from config or template
     const filters = config.filters || template.filters;
-    const filteredData = applyFilters(data, filters);
+    let filteredData = applyFilters(data, filters);
     
-    // Apply date range filter if specified
-    let dateFilteredData = filteredData;
-    if (config.dateRange) {
+    // Apply filter groups if available
+    if (template.filterGroups && template.filterGroups.length > 0) {
+      filteredData = applyFilterGroupsToData(filteredData, template.filterGroups);
+    }
+    
+    // Find date field based on primary entity type
+    let dateFieldPath = '';
+    switch (template.primaryEntityType) {
+      case ReportEntityType.TRANSACTION:
+        dateFieldPath = 'date';
+        break;
+      case ReportEntityType.GRANT:
+        dateFieldPath = 'startDate';
+        break;
+      default:
+        dateFieldPath = 'createdAt';
+    }
+    
+    // Filter by date range if specified
+    if (config.dateRange && config.dateRange.startDate && config.dateRange.endDate) {
       const { startDate, endDate } = config.dateRange;
-      
-      // Find date field based on primary entity type
-      let dateFieldPath = '';
-      switch (template.primaryEntityType) {
-        case ReportEntityType.TRANSACTION:
-          dateFieldPath = 'date';
-          break;
-        case ReportEntityType.GRANT:
-          dateFieldPath = 'startDate';
-          break;
-        default:
-          dateFieldPath = 'createdAt';
-      }
-      
-      dateFilteredData = dateFilteredData.filter(item => {
+      filteredData = filteredData.filter(item => {
         const itemDate = new Date(getNestedValue(item, dateFieldPath));
-        return itemDate >= startDate && itemDate <= endDate;
+        return itemDate >= new Date(startDate) && itemDate <= new Date(endDate);
       });
     }
     
     // Transform data for report
-    const reportData = transformData(dateFilteredData, template);
+    const reportData = transformData(filteredData, template);
     
     // Generate report in requested format
     const reportTitle = config.name || template.name;
@@ -302,7 +380,7 @@ export const generateReport = async (
     switch (config.format) {
       case ReportFormat.PDF:
         if (template.primaryEntityType === ReportEntityType.TRANSACTION) {
-          const pdfBlob = generateTransactionPDF(dateFilteredData as Transaction[], reportTitle);
+          const pdfBlob = generateTransactionPDF(filteredData as Transaction[], reportTitle);
           downloadBlob(pdfBlob, `${reportTitle.replace(/\s+/g, '_')}.pdf`);
         } else {
           // For other entity types, we'd have specialized PDF generators
@@ -312,7 +390,7 @@ export const generateReport = async (
         
       case ReportFormat.EXCEL:
         if (template.primaryEntityType === ReportEntityType.TRANSACTION) {
-          const excelBlob = generateTransactionExcel(dateFilteredData as Transaction[], reportTitle);
+          const excelBlob = generateTransactionExcel(filteredData as Transaction[], reportTitle);
           downloadBlob(excelBlob, `${reportTitle.replace(/\s+/g, '_')}.xlsx`);
         } else {
           // For other entity types, we'd have specialized Excel generators

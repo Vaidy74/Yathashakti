@@ -6,13 +6,17 @@ import {
   ReportField,
   ReportFilter,
   ReportEntityType,
+  FilterConditionGroup,
+  FilterLogicalOperator,
+  FilterPreset,
   getAllTemplates,
   generateReport
 } from '@/utils/reports';
 import { fetchReportData } from '@/utils/reports/dataFetcher';
 import TemplateSelection from './TemplateSelection';
 import FieldSelection from './FieldSelection';
-import FilterConfiguration from './FilterConfiguration';
+import AdvancedFilterConfiguration from './AdvancedFilterConfiguration';
+import { FilterConditionGroupBuilder } from './FilterConditionGroupBuilder';
 import ReportExportOptions from './ReportExportOptions';
 import ReportPreview from './ReportPreview';
 
@@ -53,6 +57,9 @@ const ReportBuilder: React.FC<ReportBuilderProps> = ({
   
   // Report filters
   const [reportFilters, setReportFilters] = useState<ReportFilter[]>([]);
+  const [filterGroups, setFilterGroups] = useState<FilterConditionGroup[]>([]);
+  const [savedFilterPresets, setSavedFilterPresets] = useState<FilterPreset[]>([]);
+  const [useAdvancedFiltering, setUseAdvancedFiltering] = useState(true);
   
   // Load templates on mount
   useEffect(() => {
@@ -89,6 +96,25 @@ const ReportBuilder: React.FC<ReportBuilderProps> = ({
     setSelectedTemplate(template);
     setSelectedFields(template.fields);
     setReportFilters(template.filters);
+    
+    // Set filter groups if available, otherwise create a default group
+    if (template.filterGroups && template.filterGroups.length > 0) {
+      setFilterGroups(template.filterGroups);
+    } else {
+      // Create a default filter group with existing filters
+      const defaultGroup: FilterConditionGroup = {
+        id: `group-${Date.now()}`,
+        logicalOperator: FilterLogicalOperator.AND,
+        conditions: [...template.filters]
+      };
+      setFilterGroups([defaultGroup]);
+    }
+    
+    // Set saved filter presets if available
+    if (template.savedFilterPresets && template.savedFilterPresets.length > 0) {
+      setSavedFilterPresets(template.savedFilterPresets);
+    }
+    
     setReportConfig(prev => ({ 
       ...prev, 
       templateId: template.id,
@@ -137,10 +163,12 @@ const ReportBuilder: React.FC<ReportBuilderProps> = ({
         ...selectedTemplate,
         fields: selectedFields,
         filters: reportFilters,
+        filterGroups: filterGroups,
+        savedFilterPresets: savedFilterPresets
       };
       
       // Generate the report
-      await generateReport(config, updatedTemplate, initialData);
+      await generateReport(config, updatedTemplate, reportData);
     } catch (err) {
       console.error('Error generating report:', err);
       setError('Failed to generate report');
@@ -150,6 +178,34 @@ const ReportBuilder: React.FC<ReportBuilderProps> = ({
   // Handle export options change
   const handleExportOptionsChange = (options: any) => {
     setReportConfig(prev => ({ ...prev, ...options }));
+  };
+  
+  // Handle filter group change
+  const handleFilterGroupChange = (updatedGroup: FilterConditionGroup) => {
+    setFilterGroups(filterGroups.map(group =>
+      group.id === updatedGroup.id ? updatedGroup : group
+    ));
+  };
+  
+  // Add a new filter group
+  const addFilterGroup = () => {
+    const newGroup: FilterConditionGroup = {
+      id: `group-${Date.now()}`,
+      logicalOperator: FilterLogicalOperator.AND,
+      conditions: []
+    };
+    
+    setFilterGroups([...filterGroups, newGroup]);
+  };
+  
+  // Remove a filter group
+  const removeFilterGroup = (groupId: string) => {
+    setFilterGroups(filterGroups.filter(group => group.id !== groupId));
+  };
+  
+  // Save filter preset
+  const saveFilterPreset = (preset: FilterPreset) => {
+    setSavedFilterPresets([...savedFilterPresets, preset]);
   };
   
   // Update data when date range changes
@@ -244,11 +300,46 @@ const ReportBuilder: React.FC<ReportBuilderProps> = ({
                 onFieldsChange={setSelectedFields}
               />
               
-              <FilterConfiguration
-                availableFields={selectedTemplate.fields}
-                filters={reportFilters}
-                onFiltersChange={setReportFilters}
-              />
+              {useAdvancedFiltering ? (
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-lg font-medium text-gray-900">Advanced Filtering</h3>
+                    <button
+                      onClick={() => setUseAdvancedFiltering(false)}
+                      className="text-sm text-blue-600 hover:text-blue-800"
+                    >
+                      Switch to Basic Filtering
+                    </button>
+                  </div>
+                  
+                  <AdvancedFilterConfiguration
+                    availableFields={selectedTemplate.fields}
+                    filters={reportFilters}
+                    filterGroups={filterGroups}
+                    onFiltersChange={setReportFilters}
+                    onFilterGroupsChange={setFilterGroups}
+                    entityType={selectedTemplate.primaryEntityType}
+                  />
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-lg font-medium text-gray-900">Basic Filtering</h3>
+                    <button
+                      onClick={() => setUseAdvancedFiltering(true)}
+                      className="text-sm text-blue-600 hover:text-blue-800"
+                    >
+                      Switch to Advanced Filtering
+                    </button>
+                  </div>
+                  
+                  <AdvancedFilterConfiguration
+                    availableFields={selectedTemplate.fields}
+                    filters={reportFilters}
+                    onFiltersChange={setReportFilters}
+                  />
+                </div>
+              )}
               
               {/* Report Preview */}
               <div className="bg-white rounded-lg border border-gray-200 p-4">
