@@ -22,7 +22,7 @@ const notificationSettingsSchema = z.object({
 const rateLimitOptions = {
   points: 10,     // 10 requests
   duration: 60,   // per minute
-  blockDuration: 300 // 5 minutes block after too many requests
+  blockDuration: 60 * 5 // 5 minutes block after too many requests
 };
 
 // GET - Fetch user notification settings

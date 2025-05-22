@@ -1,11 +1,13 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { z } from 'zod';
+import { validateBody, validateQuery, createValidationErrorResponse } from '@/utils/validation';
+import { withApiRateLimit } from '@/utils/apiRateLimit';
 
-// Schema for task creation and update
-const taskSchema = z.object({
+// Create schemas for task validation
+const taskCreateSchema = z.object({
   title: z.string().min(3, { message: "Title must be at least 3 characters long" }),
   description: z.string().optional(),
   dueDate: z.string().optional().nullable(),
@@ -16,26 +18,47 @@ const taskSchema = z.object({
   originatingMilestoneId: z.string().optional().nullable(),
 });
 
+// Schema for query parameters
+const taskQuerySchema = z.object({
+  assigneeId: z.string().optional(),
+  status: z.string().optional(),
+  priority: z.string().optional(),
+  programId: z.string().optional(),
+  search: z.string().optional(),
+  page: z.string().optional().transform(val => val ? parseInt(val) : 1),
+  limit: z.string().optional().transform(val => val ? parseInt(val) : 10),
+});
+
 // GET handler for retrieving tasks with filters
-export async function GET(request: Request) {
+export const GET = withApiRateLimit(async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { searchParams } = new URL(request.url);
+    // Validate query parameters
+    const [isValid, queryParams, validationError] = validateQuery(request, taskQuerySchema);
     
-    // Parse query parameters for filtering
-    const assigneeId = searchParams.get('assigneeId');
-    const status = searchParams.get('status');
-    const priority = searchParams.get('priority');
-    const relatedProgramId = searchParams.get('programId');
-    const search = searchParams.get('search');
+    if (!isValid) {
+      // Return validation error if query parameters are invalid
+      if (validationError) {
+        return createValidationErrorResponse(validationError);
+      }
+      return NextResponse.json({ error: 'Invalid query parameters' }, { status: 400 });
+    }
     
-    // Parse pagination parameters
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '10');
+    // Extract validated parameters
+    const {
+      assigneeId,
+      status,
+      priority,
+      programId: relatedProgramId,
+      search,
+      page = 1,
+      limit = 10
+    } = queryParams || {};
+    
     const skip = (page - 1) * limit;
 
     // Build filter object
@@ -72,7 +95,7 @@ export async function GET(request: Request) {
         originatingMilestone: {
           select: {
             id: true,
-            title: true,
+            name: true,
           }
         }
       }
@@ -94,29 +117,31 @@ export async function GET(request: Request) {
 }
 
 // POST handler for creating a new task
-export async function POST(request: Request) {
+export const POST = withApiRateLimit(async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const data = await request.json();
+    // Validate request body
+    const [isValid, validatedData, validationError] = await validateBody(request, taskCreateSchema);
     
-    // Validate the input data
-    const validation = taskSchema.safeParse(data);
-    if (!validation.success) {
-      return NextResponse.json({ error: validation.error.errors }, { status: 400 });
+    if (!isValid) {
+      // Return validation error if body is invalid
+      if (validationError) {
+        return createValidationErrorResponse(validationError);
+      }
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
     }
-
+    
     // Parse date string to Date object if provided
-    const taskData = validation.data;
-    const dueDate = taskData.dueDate ? new Date(taskData.dueDate) : null;
+    const dueDate = validatedData?.dueDate ? new Date(validatedData.dueDate) : null;
 
     // Create the task
     const task = await prisma.task.create({
       data: {
-        ...taskData,
+        ...(validatedData as any),
         dueDate,
       },
       include: {
@@ -135,4 +160,5 @@ export async function POST(request: Request) {
     console.error('Error creating task:', error);
     return NextResponse.json({ error: 'Failed to create task' }, { status: 500 });
   }
-}
+});
+
