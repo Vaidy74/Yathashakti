@@ -2,12 +2,15 @@
 
 ## 🔄 WORK IN PROGRESS
 
+### Priority 4: Technical Infrastructure
+- **PO: Performance**
+  - 🔄 PO-02: Complete server-side pagination for all list views
+
 ## Priority 5: System Improvements
 
 ## 📋 BACKLOG
 
 - **PO: Performance**
-  - PO-02: Complete server-side pagination for all list views
   - PO-03: Optimize component rendering with React.memo
 
 - **CA: Architecture**
