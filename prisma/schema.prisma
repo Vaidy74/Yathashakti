@@ -8,17 +8,20 @@ datasource db {
 }
 
 model User {
-  id            String              @id @default(cuid())
-  name          String
-  email         String              @unique
-  password      String?
-  role          UserRole            @default(FIELD_OFFICER)
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
-  logs          AuditLog[]
-  programsOwned Program[]           @relation("ProgramOwner")
-  programs      ProgramTeamMember[]
-  tasks         Task[]
+  id                String               @id @default(cuid())
+  name              String
+  email             String               @unique
+  password          String?
+  role              UserRole             @default(FIELD_OFFICER)
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  logs              AuditLog[]
+  programsOwned     Program[]            @relation("ProgramOwner")
+  programs          ProgramTeamMember[]
+  tasks             Task[]
+  notifications     Notification[]       @relation("NotificationRecipient")
+  sentNotifications Notification[]       @relation("NotificationSender")
+  notificationSettings NotificationSetting?
 }
 
 model AuditLog {
@@ -387,6 +390,7 @@ model Task {
   updatedAt              DateTime          @updatedAt
   assignee               User?             @relation(fields: [assigneeId], references: [id])
   originatingMilestone   ProgramMilestone? @relation(fields: [originatingMilestoneId], references: [id])
+  notifications          Notification[]    // Related notifications
 }
 
 enum UserRole {
@@ -534,4 +538,55 @@ enum TaskPriority {
   MEDIUM
   HIGH
   URGENT
+}
+
+enum NotificationType {
+  TASK_REMINDER
+  TASK_ASSIGNED
+  TASK_COMPLETED
+  TASK_COMMENTED
+  REPAYMENT_DUE
+  REPAYMENT_OVERDUE
+  GRANT_STATUS_UPDATE
+  PROGRAM_UPDATE
+  SYSTEM_MESSAGE
+}
+
+model Notification {
+  id              String           @id @default(cuid())
+  type            NotificationType
+  title           String
+  message         String
+  isRead          Boolean          @default(false)
+  recipientId     String
+  senderId        String?
+  relatedEntityId String?
+  relatedEntityType String?
+  taskId          String?
+  createdAt       DateTime         @default(now())
+  expiresAt       DateTime?
+  recipient       User             @relation(name: "NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  sender          User?            @relation(name: "NotificationSender", fields: [senderId], references: [id])
+  task            Task?            @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([recipientId])
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+model NotificationSetting {
+  id                      String   @id @default(cuid())
+  userId                  String   @unique
+  emailTaskReminders      Boolean  @default(true)
+  inAppTaskReminders      Boolean  @default(true)
+  emailRepaymentReminders Boolean  @default(true)
+  inAppRepaymentReminders Boolean  @default(true)
+  emailGrantUpdates       Boolean  @default(true)
+  inAppGrantUpdates       Boolean  @default(true)
+  emailProgramUpdates     Boolean  @default(true)
+  inAppProgramUpdates     Boolean  @default(true)
+  reminderLeadTime        Int      @default(24) // Hours before due date to send reminder
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  user                    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

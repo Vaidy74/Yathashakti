@@ -2,17 +2,13 @@
 
 ## 🔄 WORK IN PROGRESS
 
-### Priority 3: User Experience
+### Priority 4: Technical Infrastructure
+- **TS: Security**
+  - 🔄 TS-01: Implement rate limiting for API endpoints
+  - TS-02: Add CSRF protection for form submissions
+  - TS-03: Implement input validation with Zod
 
 ## 📋 BACKLOG
-
-### Priority 3: User Experience
-- **TM: Workflow Management**
-  - TM-01: Implement Task Management Hub
-  - TM-02: Add notifications and reminders
-  - TM-03: Develop task assignments and tracking
-
-
 
 ### Priority 4: Technical Infrastructure
 - **TS: Security**
@@ -137,6 +133,21 @@
 - **PM: Program Management**
   - ✅ PM-01: Add New Program with Multi-tabbed Interface
   - ✅ PM-02: View Program List with Filters
+
+- **TM: Workflow Management**
+  - ✅ TM-01: Implement Task Management Hub
+    - ✅ TM-01.1: Create Task Data Models
+    - ✅ TM-01.2: Implement Task List UI
+    - ✅ TM-01.3: Build Task Detail View
+    - ✅ TM-01.4: Develop Task Creation/Editing Form
+  - ✅ TM-02: Add notifications and reminders
+    - ✅ TM-02.1: Create notification data model
+    - ✅ TM-02.2: Implement notification center UI
+    - ✅ TM-02.3: Add task due date reminders
+  - ✅ TM-03: Develop task assignments and tracking
+    - ✅ TM-03.1: Implement assignee selection and assignment features
+    - ✅ TM-03.2: Create task progress tracking
+    - ✅ TM-03.3: Add task completion workflows
 
 - **SPM: Service Provider Management**
   - ✅ SPM-01: TypeScript interfaces and Prisma schema

@@ -1,5 +1,35 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
+import { JWT } from "next-auth/jwt";
+import { Session } from "next-auth";
+
+// Extend the session type to include our custom properties
+declare module "next-auth" {
+  interface Session {
+    user: {
+      id: string;
+      name?: string | null;
+      email?: string | null;
+      image?: string | null;
+      role: string;
+    };
+  }
+  
+  interface User {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+  }
+}
+
+// Extend the JWT type
+declare module "next-auth/jwt" {
+  interface JWT {
+    id: string;
+    role: string;
+  }
+}
 
 export const authOptions: NextAuthOptions = {
   session: {
@@ -33,12 +63,14 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
+        token.id = user.id;
         token.role = user.role;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
+        session.user.id = token.id;
         session.user.role = token.role;
       }
       return session;

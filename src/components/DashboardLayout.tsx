@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
-import { Bell, Search } from 'lucide-react';
+import { Search } from 'lucide-react';
 import AssistantBot from './AssistantBot';
 import { usePathname } from 'next/navigation';
+import NotificationCenter from './notifications/NotificationCenter';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -73,11 +74,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 />
               </div>
             </div>
-            <div className="ml-4 flex items-center md:ml-6">
-              <button className="p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                <span className="sr-only">View notifications</span>
-                <Bell className="h-6 w-6" />
-              </button>
+            <div className="ml-4 flex items-center md:ml-6 space-x-4">
+              <NotificationCenter />
             </div>
           </div>
         </header>
