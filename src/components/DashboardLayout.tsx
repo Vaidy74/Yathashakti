@@ -1,14 +1,56 @@
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
 import { Bell, Search } from 'lucide-react';
+import AssistantBot from './AssistantBot';
+import { usePathname } from 'next/navigation';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
 }
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
+  const [appState, setAppState] = useState({
+    isEmpty: false,
+    totalGrants: 0,
+    totalPrograms: 0,
+    serviceProviders: 0
+  });
+  const pathname = usePathname();
+  
+  // Get the current page section from pathname
+  const getCurrentPage = () => {
+    if (pathname === '/') return 'dashboard';
+    if (pathname.includes('/dashboard')) return 'analytics';
+    if (pathname.includes('/grants')) return 'grants';
+    if (pathname.includes('/programs')) return 'programs';
+    if (pathname.includes('/service-providers')) return 'service-providers';
+    return 'dashboard';
+  };
+  
+  // Fetch app state data for the assistant
+  useEffect(() => {
+    const fetchAppState = async () => {
+      try {
+        const response = await fetch('/api/dashboard?dateRange=last30days');
+        if (response.ok) {
+          const data = await response.json();
+          setAppState({
+            isEmpty: data.isEmpty || false,
+            totalGrants: data.stats?.totalGrants || 0,
+            totalPrograms: data.stats?.activePrograms || 0,
+            serviceProviders: data.stats?.serviceProviders || 0
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching app state:', error);
+      }
+    };
+    
+    fetchAppState();
+  }, [pathname]);
+
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Sidebar */}
@@ -44,6 +86,16 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         <main className="flex-1 overflow-auto">
           {children}
         </main>
+        
+        {/* AI Assistant Bot - Available across the platform */}
+        <AssistantBot 
+          appState={{
+            isEmpty: appState.isEmpty,
+            currentPage: getCurrentPage(),
+            totalGrants: appState.totalGrants,
+            totalPrograms: appState.totalPrograms
+          }}
+        />
       </div>
     </div>
   );

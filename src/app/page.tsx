@@ -1,108 +1,123 @@
 "use client";
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import DashboardLayout from '@/components/DashboardLayout';
 import KpiCard from '@/components/dashboard/KpiCard';
 import DonutChart from '@/components/dashboard/DonutChart';
 import LineChart from '@/components/dashboard/LineChart';
+import toast from 'react-hot-toast';
 
 export default function Dashboard() {
-  // Monthly grant disbursement mock data
-  const monthlyDisbursementData = {
-    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
-    datasets: [
-      {
-        label: 'Amount Disbursed (₹)',
-        data: [0, 0, 50000, 30000, 0, 0, 15000, 0, 10000, 0, 0, 0],
-        fill: false,
-        borderColor: 'rgb(59, 130, 246)',
-        tension: 0.4,
-        pointBackgroundColor: 'rgb(59, 130, 246)',
-      }
-    ]
-  };
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isEmpty, setIsEmpty] = useState<boolean>(true);
+  const [stats, setStats] = useState({
+    totalGrants: 0,
+    activeGrants: 0,
+    activePrograms: 0,
+    disbursedAmount: 0,
+    serviceProviders: 0
+  });
   
-  // Calculate the total disbursement amount from monthly data
-  const totalDisbursed = monthlyDisbursementData.datasets[0].data.reduce((sum, amount) => sum + amount, 0);
-  const formattedTotal = totalDisbursed >= 100000 
-    ? `₹${(totalDisbursed / 100000).toFixed(1)}L` 
-    : `₹${totalDisbursed.toLocaleString('en-IN')}`;
+  // Fetch dashboard data from the database
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      setIsLoading(true);
+      try {
+        const response = await fetch('/api/dashboard?dateRange=last30days');
+        if (!response.ok) {
+          throw new Error('Failed to fetch dashboard data');
+        }
+        
+        const data = await response.json();
+        setStats(data.stats);
+        setIsEmpty(data.isEmpty || false);
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+        toast.error('Failed to load dashboard data');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchDashboardData();
+  }, []);
 
-  // Mock data for the dashboard
+  // Format currency for display
+  const formatCurrency = (amount: number) => {
+    if (amount >= 10000000) { // 1 Cr+
+      return `₹${(amount / 10000000).toFixed(1)}Cr`;
+    } else if (amount >= 100000) { // 1L+
+      return `₹${(amount / 100000).toFixed(1)}L`;
+    } else if (amount >= 1000) { // 1K+
+      return `₹${(amount / 1000).toFixed(1)}K`;
+    } else {
+      return `₹${amount.toFixed(0)}`;
+    }
+  };
+
+  // KPI data from real database
   const kpiData = [
     {
       title: 'Grants Under Management',
-      value: formattedTotal, // Use the calculated total
-      description: 'Click to view details',
-      trend: '+5%',
+      value: isEmpty ? '0' : formatCurrency(stats.disbursedAmount),
+      description: 'View details',
+      trend: isEmpty ? 'stable' : '+5%',
       icon: 'TrendingUp',
       color: 'blue'
     },
     {
       title: 'Live Programs',
-      value: '2',
-      description: 'Click to view details',
-      trend: 'stable',
-      icon: 'Activity', 
+      value: isEmpty ? '0' : stats.activePrograms.toString(),
+      description: 'View details',
+      trend: isEmpty ? 'stable' : 'stable',
+      icon: 'Activity',
       color: 'green'
     },
     {
       title: 'Total Number of Grantees',
-      value: '4',
-      description: 'Click to view details', 
-      trend: '+2',
+      value: isEmpty ? '0' : stats.totalGrants.toString(),
+      description: 'View details',
+      trend: isEmpty ? 'stable' : '+2',
       icon: 'Users',
       color: 'purple'
     },
     {
-      title: 'Overdue Grants',
-      value: '0',
-      description: 'Click to view details',
-      trend: '-1',
-      icon: 'AlertTriangle',
-      color: 'red'
+      title: 'Service Providers',
+      value: isEmpty ? '0' : stats.serviceProviders.toString(),
+      description: 'View details',
+      trend: isEmpty ? 'stable' : '0',
+      icon: 'AlertTriangle', // Changed from 'Briefcase' to match available icons
+      color: 'red' // Changed to match colors in KpiCard
     }
   ];
 
-  // Program status mock data
-  const programStatusData = {
-    labels: ['Planning', 'Live', 'On Hold', 'Closed'],
-    datasets: [
-      {
-        data: [1, 2, 0, 1],
-        backgroundColor: [
-          'rgba(96, 165, 250, 0.8)',
-          'rgba(34, 197, 94, 0.8)',
-          'rgba(234, 179, 8, 0.8)',
-          'rgba(239, 68, 68, 0.8)'
-        ],
-        borderWidth: 1,
-      },
-    ]
+  // Empty chart data for structure without mock values but with proper formatting
+  const emptyChartData = {
+    labels: ['No Data'],
+    datasets: [{
+      data: [1],
+      backgroundColor: ['rgba(200, 200, 200, 0.3)'],
+      borderWidth: 1
+    }]
   };
 
-  // Program category mock data
-  const programCategoryData = {
-    labels: ['Skilling', 'Agriculture', 'Entrepreneurship', 'Education'],
-    datasets: [
-      {
-        data: [1, 1, 1, 1],
-        backgroundColor: [
-          'rgba(59, 130, 246, 0.8)',
-          'rgba(16, 185, 129, 0.8)',
-          'rgba(249, 115, 22, 0.8)',
-          'rgba(139, 92, 246, 0.8)'
-        ],
-        borderWidth: 1,
-      },
-    ]
+  // Empty line chart data
+  const emptyLineData = {
+    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+    datasets: [{
+      label: 'Amount Disbursed (₹)',
+      data: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      fill: false,
+      borderColor: 'rgb(59, 130, 246)',
+      tension: 0.4,
+      pointBackgroundColor: 'rgb(59, 130, 246)',
+    }]
   };
-
-  // Monthly grant disbursement data is defined above
 
   return (
     <DashboardLayout>
-      <div className="p-4">
+      <div className="p-4" data-component-name="Dashboard">
         <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
         <p className="text-sm text-gray-500 mb-8">View real-time program stats and track campaign effectiveness</p>
         
@@ -121,18 +136,20 @@ export default function Dashboard() {
           ))}
         </div>
 
+        {/* Database empty notification moved to analytics dashboard */}
+
         {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <div className="bg-white p-4 rounded-lg shadow">
             <h2 className="text-lg font-semibold mb-4">Program Overview by Status</h2>
             <div className="h-64">
-              <DonutChart data={programStatusData} />
+              <DonutChart data={emptyChartData} />
             </div>
           </div>
           <div className="bg-white p-4 rounded-lg shadow">
             <h2 className="text-lg font-semibold mb-4">Program Overview by Category</h2>
             <div className="h-64">
-              <DonutChart data={programCategoryData} />
+              <DonutChart data={emptyChartData} />
             </div>
           </div>
         </div>
@@ -141,9 +158,11 @@ export default function Dashboard() {
         <div className="bg-white p-4 rounded-lg shadow mb-8">
           <h2 className="text-lg font-semibold mb-4">Monthly Grant Disbursement (Last 12 Months)</h2>
           <div className="h-64">
-            <LineChart data={monthlyDisbursementData} />
+            <LineChart data={emptyLineData} />
           </div>
         </div>
+        
+        {/* Action cards removed for cleaner dashboard */}
       </div>
     </DashboardLayout>
   );

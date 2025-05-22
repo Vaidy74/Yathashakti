@@ -40,7 +40,7 @@ const navCategories = [
     name: 'Monitor', 
     icon: Gauge,
     items: [
-      { name: 'Reports', href: '/reports', icon: BarChart2 },
+      { name: 'Analytics Dashboard', href: '/dashboard', icon: PieChart },
       { name: 'Ledger', href: '/ledger', icon: FileText },
     ] 
   },

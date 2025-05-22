@@ -1,0 +1,4 @@
+DATABASE_URL="postgresql://postgres:YourPassword@localhost:5432/yathashakti?schema=public"
+NEXTAUTH_SECRET="your-secret-value-for-next-auth"
+NEXTAUTH_URL="http://localhost:3000"
+OPENROUTER_API_KEY=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

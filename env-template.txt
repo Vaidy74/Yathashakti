@@ -1,0 +1,1 @@
+DATABASE_URL="postgresql://postgres:Nini2720@localhost:5432/yathashakti?schema=public"

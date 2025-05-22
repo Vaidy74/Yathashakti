@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import DashboardLayout from "@/components/DashboardLayout";
 import ReportFilters from "@/components/dashboard/reporting/ReportFilters";
+import ReportBuilder from "@/components/reports/ReportBuilder";
 import { 
   BarChart3, 
   FileText, 
@@ -16,15 +17,29 @@ import {
   FileBarChart,
   MapPin,
   Mail,
-  FileQuestion
+  FileQuestion,
+  Settings
 } from "lucide-react";
 
 export default function ReportsPage() {
   const [activeFilters, setActiveFilters] = useState({});
+  const [showReportBuilder, setShowReportBuilder] = useState(false);
+  const [reportData, setReportData] = useState([]);
   
   const handleApplyFilters = (filters) => {
     setActiveFilters(filters);
     console.log("Applied filters:", filters);
+  };
+  
+  const openReportBuilder = () => {
+    // In a real app, we would fetch data for the report here
+    // For demo purposes, we're using empty data
+    setReportData([]);
+    setShowReportBuilder(true);
+  };
+  
+  const closeReportBuilder = () => {
+    setShowReportBuilder(false);
   };
   
   // Report categories and individual reports
@@ -125,22 +140,38 @@ export default function ReportsPage() {
     }
   ];
 
+  // If report builder is open, show that instead of the reports list
+  if (showReportBuilder) {
+    return (
+      <DashboardLayout>
+        <ReportBuilder 
+          initialData={reportData} 
+          onClose={closeReportBuilder} 
+        />
+      </DashboardLayout>
+    );
+  }
+  
   return (
     <DashboardLayout>
       <div className="p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-gray-800 flex items-center">
-            <FileBarChart className="h-6 w-6 mr-2 text-blue-500" />
-            Reports
+        <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center mb-4 md:mb-0">
+            <FileText className="h-6 w-6 mr-2 text-blue-600" />
+            Reports & Analytics
           </h1>
+
           <div className="flex space-x-3">
-            <button className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-              <Download className="h-4 w-4 mr-2" />
-              Export All
+            <button 
+              onClick={openReportBuilder}
+              className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50"
+            >
+              <Settings className="h-4 w-4 mr-2" />
+              Custom Report Builder
             </button>
-            <button className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
-              <FileText className="h-4 w-4 mr-2" />
-              Generate Report
+            <button className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700">
+              <Download className="h-4 w-4 mr-2" />
+              Export
             </button>
           </div>
         </div>
