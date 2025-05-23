@@ -4,6 +4,7 @@ import { useState } from "react";
 import { signIn } from "next-auth/react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -18,10 +19,12 @@ export default function LoginPage() {
     setError("");
 
     try {
+      setIsLoading(true);
       const result = await signIn("credentials", {
         redirect: false,
         email,
         password,
+        callbackUrl: '/'
       });
 
       if (result?.error) {
@@ -30,8 +33,8 @@ export default function LoginPage() {
         return;
       }
 
-      // Redirect to dashboard on success
-      router.push("/");
+      // Keep loading state true during redirect
+      router.push('/');
       router.refresh();
     } catch (error) {
       setError("An unexpected error occurred. Please try again.");
@@ -98,14 +101,17 @@ export default function LoginPage() {
 
             <button
               type="submit"
+              className="w-full flex justify-center items-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={isLoading}
-              className={`w-full py-2 px-4 border border-transparent rounded-md ${
-                isLoading
-                  ? "bg-blue-300 cursor-not-allowed"
-                  : "bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              } text-white font-medium`}
             >
-              {isLoading ? "Signing in..." : "Sign in"}
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Signing in...
+                </>
+              ) : (
+                'Sign in'
+              )}
             </button>
           </form>
         </div>

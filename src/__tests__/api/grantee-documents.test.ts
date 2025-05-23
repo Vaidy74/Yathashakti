@@ -26,7 +26,7 @@ jest.mock('next-auth/next', () => ({
 }));
 
 // Mock Request and Response
-function createMockRequest(method = 'GET', body = null, params = {}) {
+function createMockRequest(method: string = 'GET', body: any = null, params: any = {}) {
   const request = {
     method,
     nextUrl: { searchParams: new URLSearchParams() },

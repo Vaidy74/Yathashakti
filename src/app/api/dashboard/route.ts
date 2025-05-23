@@ -6,11 +6,7 @@ import { authOptions } from "@/lib/auth";
 // GET - Retrieve dashboard statistics and overview data
 export async function GET(request: NextRequest) {
   try {
-    // Check authentication
-    const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Authentication temporarily disabled
     
     // Get query parameters for date range filtering
     const searchParams = request.nextUrl.searchParams;

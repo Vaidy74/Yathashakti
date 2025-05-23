@@ -8,7 +8,7 @@ import {
   Home, Users, PieChart, FileText, DollarSign, 
   Briefcase, Award, Calendar, Settings, 
   BarChart2, Heart, User, Bot, ChevronDown, ChevronRight,
-  Wrench, Gauge, FolderClosed, MessageCircle
+  Wrench, Gauge, FolderClosed, MessageCircle, FileBarChart
 } from 'lucide-react';
 
 // Add Home Page at the very top

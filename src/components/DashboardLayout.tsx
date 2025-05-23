@@ -4,14 +4,19 @@ import React, { useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
 import { Search } from 'lucide-react';
 import AssistantBot from './AssistantBot';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import NotificationCenter from './notifications/NotificationCenter';
+import { useSession } from 'next-auth/react';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
 }
 
+import { Loader2 } from 'lucide-react';
+
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
+  const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
   const [appState, setAppState] = useState({
     isEmpty: false,
     totalGrants: 0,
@@ -51,6 +56,17 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     
     fetchAppState();
   }, [pathname]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto" />
+          <p className="mt-2 text-sm text-gray-500">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-gray-50">

@@ -16,7 +16,7 @@ import { fetchReportData } from '@/utils/reports/dataFetcher';
 import TemplateSelection from './TemplateSelection';
 import FieldSelection from './FieldSelection';
 import AdvancedFilterConfiguration from './AdvancedFilterConfiguration';
-import { FilterConditionGroupBuilder } from './FilterConditionGroupBuilder';
+import FilterConditionGroupBuilder from './FilterConditionGroupBuilder';
 import ReportExportOptions from './ReportExportOptions';
 import ReportPreview from './ReportPreview';
 

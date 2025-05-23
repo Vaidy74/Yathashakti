@@ -23,16 +23,12 @@ import {
   Text,
   Stack,
   Input,
-  useToast
-} from '@chakra-ui/react';
-import {
+  useToast,
   Tabs,
   TabList,
   TabPanels,
   Tab,
-  TabPanel
-} from '@chakra-ui/tabs';
-import {
+  TabPanel,
   Modal,
   ModalOverlay,
   ModalContent,
@@ -41,7 +37,7 @@ import {
   ModalBody,
   ModalCloseButton,
   useDisclosure
-} from '@chakra-ui/modal';
+} from '@chakra-ui/react';
 
 interface AdvancedFilterConfigurationProps {
   availableFields: ReportField[];
